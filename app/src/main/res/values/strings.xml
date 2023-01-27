@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">TestFaceDetection</string>
     <string name="button_name">Scan</string>
+    <string name="text_in_textview">You are good</string>
 </resources>

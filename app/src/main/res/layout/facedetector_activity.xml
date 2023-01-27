@@ -19,5 +19,12 @@ android:layout_height="match_parent">
     android:layout_height="wrap_content"
     android:scaleType="centerCrop" />
 
+    <TextView
+        android:id="@+id/textView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/text_in_textview"
+        android:textSize="24sp" />
+
 
 </LinearLayout>

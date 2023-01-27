@@ -1,19 +1,41 @@
 package com.tech.testfacedetection;
 
+
+import static android.content.Context.MODE_PRIVATE;
+
 public class DriverParameters {
     //TODO save data to storage
+
+    public DriverParameters(float ry, float rz, float eop, float mor, float eyeclf){
+        this.rotY = ry;
+        this.rotZ = rz;
+        this.EOP= eop;
+        this.MOR = mor;
+        this.eyeCloseFreq = eyeclf;
+        this.areParamsSet = true;
+    }
+
+    public DriverParameters(){
+        rotY = 0;
+        rotZ = 0;
+        EOP = 0.8f;
+        MOR = 0.15f;
+    }
+
     private boolean areParamsSet = false;
 
-    private float rotY = 0;
-    private float rotZ = 0;
+    private float rotY;
+    private float rotZ;
 
-    private float EAR = 1;
-    private float MOR = 0;
+    //instead of eye aspect ratio EAR use EOP which is eye open probability
+    //set the appropriate number between 0.0 and 1.0
+    private float EOP;
+    private float MOR;
 
     private float eyeCloseFreq = 0.25f;
 
-    public float getEAR() {
-        return EAR;
+    public float getEOP() {
+        return EOP;
     }
 
     public float getEyeCloseFreq() {
@@ -32,8 +54,8 @@ public class DriverParameters {
         return rotZ;
     }
 
-    public void setEAR(float EAR) {
-        this.EAR = EAR;
+    public void setEOP(float EOP) {
+        this.EOP = EOP;
     }
 
     public void setEyeCloseFreq(float eyeCloseFreq) {

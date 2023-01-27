@@ -1,5 +1,6 @@
 package com.tech.testfacedetection;
 import android.Manifest;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -11,6 +12,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.Image;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
@@ -18,6 +20,7 @@ import android.util.Size;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -48,7 +51,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
 import java.util.concurrent.ExecutionException;
+
+import com.tech.testfacedetection.FaceAnalyzer;
 
 
 public class FaceDetectorActivity extends AppCompatActivity {
@@ -56,6 +62,7 @@ public class FaceDetectorActivity extends AppCompatActivity {
 
     private Button scan_button;
     private ImageView preview;
+    private TextView textView;
 
     private FaceDetectorOptions realTimeOpts = new FaceDetectorOptions.Builder()
                     .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -68,8 +75,17 @@ public class FaceDetectorActivity extends AppCompatActivity {
     ListenableFuture<ProcessCameraProvider> cameraProvideFuture;
 
     private DrawContours drawer = new DrawContours();
-
     private Bitmap bitmap;
+
+    DriverParameters params;
+    private MediaPlayer playerRed;
+    private MediaPlayer playerYellow;
+    ArrayList<LogObject> log = new ArrayList<>();
+
+    SharedPreferences sharedPrefs;
+    SharedPreferences.Editor editor;
+
+    //private DrowsinessAnalyzer timelyAnalyzer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,12 +94,37 @@ public class FaceDetectorActivity extends AppCompatActivity {
 
         preview = findViewById(R.id.imageView);
         scan_button = findViewById(R.id.button);
+        textView = findViewById(R.id.textView);
+
+        params = new DriverParameters();
+
+        /*playerRed = MediaPlayer.create(this, R.raw.bleep);
+        playerRed.setVolume(1.0f, 1.0f);
+        playerYellow = MediaPlayer.create(this, R.raw.notification);
+        playerYellow.setVolume(0.5f, 0.5f);*/
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
         } else {
             initCamera();
         }
+
+        sharedPrefs = getSharedPreferences("driverParams", MODE_PRIVATE);
+
+        /*if(sharedPrefs.contains("paramsSet")){
+            boolean areParamsSet = sharedPrefs.getBoolean("paramsSet", false);
+            while (!areParamsSet){
+                setDriverParameters();
+            }
+        } else {
+            sharedPrefs = getSharedPreferences("driverParams", MODE_PRIVATE);
+            boolean areParamsSet = sharedPrefs.getBoolean("paramsSet", false);
+            while (!areParamsSet){
+                setDriverParameters();
+            }
+        }*/
+
+        //new Timer().schedule(new DrowsinessAnalyzer(FaceDetectorActivity.this), 0, 3000);
     }
 
     @Override
@@ -112,83 +153,7 @@ public class FaceDetectorActivity extends AppCompatActivity {
                             .build();
 
                     imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(FaceDetectorActivity.this),
-                            new ImageAnalysis.Analyzer() {
-                                @Override
-                                public void analyze(@NonNull ImageProxy image) {
-                                    long startTime = System.nanoTime();
-                                    Image img = image.getImage();
-                                    bitmap = translator.translateYUV(img, FaceDetectorActivity.this);
-                                    bitmap = rotateImage(bitmap, image.getImageInfo().getRotationDegrees());
-
-
-                                    if (img != null){
-                                        InputImage inputImage = InputImage.fromMediaImage(img, image.getImageInfo().getRotationDegrees());
-                                        Task<List<Face>> result =
-                                                detector.process(inputImage)
-                                                        .addOnSuccessListener(
-                                                                new OnSuccessListener<List<Face>>() {
-                                                                    @Override
-                                                                    public void onSuccess(List<Face> faces) {
-                                                                        // Task completed successfully
-                                                                        //facesList = faces;
-                                                                        Log.v(null, "faces were obtained");
-
-                                                                        for (Face face : faces){
-                                                                            Rect bounds = face.getBoundingBox();
-                                                                            bitmap = drawer.drawRect(bitmap, bounds);
-
-                                                                            float rotY = face.getHeadEulerAngleY();  // Head is rotated to the right rotY degrees
-                                                                            float rotZ = face.getHeadEulerAngleZ();
-
-                                                                            List<PointF> leftEyeContour = face.getContour(FaceContour.LEFT_EYE).getPoints();
-                                                                            bitmap = drawer.drawContours(bitmap, leftEyeContour);
-                                                                            List<PointF> rightEyeContour = face.getContour(FaceContour.RIGHT_EYE).getPoints();
-                                                                            bitmap = drawer.drawContours(bitmap, rightEyeContour);
-                                                                            List<PointF> upperLipBottomContour = face.getContour(FaceContour.UPPER_LIP_BOTTOM).getPoints();
-                                                                            bitmap = drawer.drawContours(bitmap, upperLipBottomContour);
-                                                                            List<PointF> lowerLipTopContour = face.getContour(FaceContour.LOWER_LIP_TOP).getPoints();
-                                                                            bitmap = drawer.drawContours(bitmap, lowerLipTopContour);
-
-                                                                            log(leftEyeContour, rightEyeContour, upperLipBottomContour, lowerLipTopContour, rotY, rotZ);
-
-                                                                            Log.v(null, Float.toString(rotY) + " roty");
-                                                                            Log.v(null, Float.toString(rotZ) + " rotz");
-
-                                                                        }
-
-                                                                    }
-                                                                })
-                                                        .addOnFailureListener(
-                                                                new OnFailureListener() {
-                                                                    @Override
-                                                                    public void onFailure(@NonNull Exception e) {
-                                                                        // Task failed with an exception
-                                                                        System.out.println("there was an error processing an image");
-                                                                    }
-                                                                })
-                                                        .addOnCompleteListener(
-                                                                new OnCompleteListener<List<Face>>() {
-                                                                    @Override
-                                                                    public void onComplete(@NonNull Task<List<Face>> task) {
-
-                                                                        //preview.setRotation(image.getImageInfo().getRotationDegrees());
-
-                                                                        preview.setImageBitmap(bitmap);
-
-                                                                        image.close();
-
-                                                                        long endTime = System.nanoTime();
-                                                                        long timePassed = endTime - startTime;
-                                                                        Log.v(null, "Execution time in milliseconds: " + timePassed / 1000000);
-
-                                                                    }
-                                                                }
-                                                        );
-
-                                    }
-
-                                }
-                            });
+                            new FaceAnalyzer(FaceDetectorActivity.this));
 
                     cameraProvider.bindToLifecycle(FaceDetectorActivity.this, cameraSelector, imageAnalysis);
 
@@ -201,21 +166,101 @@ public class FaceDetectorActivity extends AppCompatActivity {
         }, ContextCompat.getMainExecutor(this));
     }
 
-    private void log(List<PointF> le, List<PointF> re, List<PointF> ul, List<PointF> ll, float rY, float rZ){
 
+
+    public void setPreview(Bitmap bitmap){
+        preview.setImageBitmap(bitmap);
+    }
+
+    public void playerStart(){
+        if (!playerRed.isPlaying()) playerRed.start();
+    }
+
+    public void playerStop(){
+        if (playerRed.isPlaying()){
+            playerRed.stop();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        playerRed.release();
+        playerRed = null;
+    }
+
+    
+    
+    private void setDriverParameters(){
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e){
+            Log.e(null, "error with Thread.sleep in setting driver params");
+        }
+
+        float avMor = 0;
+        float avEop = 0;
+        float avRotY = 0;
+        float avRotZ = 0;
+        int blinkFreq = 0;
+
+        for (int i = 0; i<log.size(); i++){
+            avMor += log.get(i).mor;
+            avEop += log.get(i).eop;
+            avRotY += log.get(i).rotY;
+            avRotZ += log.get(i).rotZ;
+
+            if (log.get(i).eyeClosed) blinkFreq++;
+        }
+
+        avMor = avMor/log.size();
+        avEop = avEop/log.size();
+        avRotY = avRotY/log.size();
+        avRotZ = avRotZ/log.size();
+        blinkFreq = blinkFreq/10;
+
+        if (avMor > 0.4 || avEop < 0.1 || avRotY > 30.0 || avRotZ > 30.0){
+            return;
+        } else {
+            params.setMOR(avMor);
+            params.setEOP(avEop);
+            params.setRotY(avRotY);
+            params.setRotZ(avRotZ);
+            params.setEyeCloseFreq(blinkFreq);
+            params.setAreParamsSet(true);
+
+            editor = sharedPrefs.edit();
+
+            editor.putFloat("MOR", avMor);
+            editor.putFloat("EAR", avEop);
+            editor.putFloat("rotY", avRotY);
+            editor.putFloat("rotZ", avRotZ);
+            editor.putFloat("blinkFreq", blinkFreq);
+            editor.putBoolean("paramsSet", true);
+
+            editor.apply();
+        }
     }
 
 
-
-
-    public static Bitmap rotateImage(Bitmap source, int angle) {
-        Matrix matrix = new Matrix();
-        matrix.postRotate(angle);
-        return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(),
-                matrix, true);
+    public void enableWarning(String msg){
+        //textView.setText("YOU SEEM TO BE SLEEPY, PLEASE CONSIDER STOPPING SOMEWHERE");
+        textView.setText(msg);
+        //if (!playerYellow.isPlaying()) playerYellow.start();
     }
 
+    public void enableAlert(String msg){
+        //textView.setText("WAKE UP! FIND SOME PLACE TO REST");
+        textView.setText(msg);
+        //if (!playerRed.isPlaying()) playerRed.start();
+    }
 
-
-
+    public void resetText(){
+        textView.setText("You are good");
+    }
+    //TODO do not forget to turn on the player again
 }
+
+
+//TODO implement runnable to create thread to clean array and compare blinking frequency every 10 seconds
+//TODO and compare MOR and EOP every 2 seconds
