@@ -15,6 +15,9 @@ import android.media.Image;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.util.Log;
 import android.util.Size;
 import android.view.View;
@@ -50,11 +53,14 @@ import org.jetbrains.annotations.NotNull;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Timer;
 import java.util.concurrent.ExecutionException;
 
 import com.tech.testfacedetection.FaceAnalyzer;
+
+import static android.preference.PreferenceManager.getDefaultSharedPreferences;
 
 
 public class FaceDetectorActivity extends AppCompatActivity {
@@ -80,10 +86,10 @@ public class FaceDetectorActivity extends AppCompatActivity {
     DriverParameters params;
     private MediaPlayer playerRed;
     private MediaPlayer playerYellow;
-    ArrayList<LogObject> log = new ArrayList<>();
+    ArrayList<LogObject> log;
 
     SharedPreferences sharedPrefs;
-    SharedPreferences.Editor editor;
+
 
     //private DrowsinessAnalyzer timelyAnalyzer;
 
@@ -97,6 +103,7 @@ public class FaceDetectorActivity extends AppCompatActivity {
         textView = findViewById(R.id.textView);
 
         params = new DriverParameters();
+        log  = new ArrayList<>(Arrays.asList(new LogObject[]{new LogObject()}));
 
         /*playerRed = MediaPlayer.create(this, R.raw.bleep);
         playerRed.setVolume(1.0f, 1.0f);
@@ -109,22 +116,24 @@ public class FaceDetectorActivity extends AppCompatActivity {
             initCamera();
         }
 
-        sharedPrefs = getSharedPreferences("driverParams", MODE_PRIVATE);
+        sharedPrefs = getDefaultSharedPreferences(this);
+        checkDriverParameters();
 
-        /*if(sharedPrefs.contains("paramsSet")){
-            boolean areParamsSet = sharedPrefs.getBoolean("paramsSet", false);
-            while (!areParamsSet){
-                setDriverParameters();
+        /*new Thread(new Runnable() {
+            @Override
+            public void run() {
+                log.size();
             }
-        } else {
-            sharedPrefs = getSharedPreferences("driverParams", MODE_PRIVATE);
-            boolean areParamsSet = sharedPrefs.getBoolean("paramsSet", false);
-            while (!areParamsSet){
-                setDriverParameters();
-            }
-        }*/
+        }).start();
 
-        //new Timer().schedule(new DrowsinessAnalyzer(FaceDetectorActivity.this), 0, 3000);
+        Timer timer = new Timer();
+        timer.schedule(new DrowsinessAnalyzer(FaceDetectorActivity.this), 6000, 0);*/
+
+        HandlerThread handlerThread = new HandlerThread("MyHandlerThread");
+        handlerThread.start();
+        Looper looper = handlerThread.getLooper();
+        Handler handler = new Handler(looper);
+        handler.post(new DrowsinessAnalyzer(this));
     }
 
     @Override
@@ -149,7 +158,7 @@ public class FaceDetectorActivity extends AppCompatActivity {
                             .build();
 
                     CameraSelector cameraSelector = new CameraSelector.Builder()
-                            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                            .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
                             .build();
 
                     imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(FaceDetectorActivity.this),
@@ -191,7 +200,43 @@ public class FaceDetectorActivity extends AppCompatActivity {
 
     
     
-    private void setDriverParameters(){
+    private void checkDriverParameters(){
+
+        SharedPreferences.Editor editor = sharedPrefs.edit();
+
+        if (!sharedPrefs.contains("paramsSet")) {
+            editor.putBoolean("paramsSet", false);
+            editor.commit();
+        } else {
+            if (sharedPrefs.getBoolean("paramsSet", false)){
+                params.setMOR(sharedPrefs.getFloat("MOR", 0.2f));
+                params.setEOP(sharedPrefs.getFloat("EOP", 0.5f));
+                params.setRotY(sharedPrefs.getFloat("rotY", 0));
+                params.setRotZ(sharedPrefs.getFloat("rotZ", 0));
+                params.setEyeCloseFreq(sharedPrefs.getFloat("blinkFreq", 0.25f));
+                params.setAreParamsSet(true);
+            }
+        }
+
+        while (!sharedPrefs.getBoolean("paramsSet", false)){
+            setDriverParameters(editor);
+        }
+
+    }
+
+    private void setDriverParameters(SharedPreferences.Editor editor){
+
+        /*Runnable infoColl = new Runnable() {
+            @Override
+            public void run() {
+
+            }
+        };
+
+        Thread thread = new Thread(infoColl);
+        thread.start();*/
+
+
         try {
             Thread.sleep(10000);
         } catch (InterruptedException e){
@@ -229,8 +274,6 @@ public class FaceDetectorActivity extends AppCompatActivity {
             params.setEyeCloseFreq(blinkFreq);
             params.setAreParamsSet(true);
 
-            editor = sharedPrefs.edit();
-
             editor.putFloat("MOR", avMor);
             editor.putFloat("EAR", avEop);
             editor.putFloat("rotY", avRotY);
@@ -238,7 +281,8 @@ public class FaceDetectorActivity extends AppCompatActivity {
             editor.putFloat("blinkFreq", blinkFreq);
             editor.putBoolean("paramsSet", true);
 
-            editor.apply();
+            editor.commit();
+            textView.setText("All parameters set!");
         }
     }
 
@@ -258,9 +302,20 @@ public class FaceDetectorActivity extends AppCompatActivity {
     public void resetText(){
         textView.setText("You are good");
     }
-    //TODO do not forget to turn on the player again
+
+    public void setText(String msg){
+        /*runOnUiThread(new Runnable() {
+
+            @Override
+            public void run() {
+
+                textView.setText(msg);
+            }
+        });*/
+        textView.setText(msg);
+
+    }
 }
 
 
-//TODO implement runnable to create thread to clean array and compare blinking frequency every 10 seconds
-//TODO and compare MOR and EOP every 2 seconds
+

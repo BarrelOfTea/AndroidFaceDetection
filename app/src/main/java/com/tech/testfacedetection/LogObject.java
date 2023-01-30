@@ -16,6 +16,10 @@ public class LogObject {
     boolean mouthOpen;
     boolean headInclined;
 
+    public LogObject(){
+
+    }
+
     public LogObject(LocalTime time, boolean eyeClosed, boolean mouthOpen, boolean headInclined, float roty, float rotz, float eop, float mor){
 
         this.eyeClosed = eyeClosed;

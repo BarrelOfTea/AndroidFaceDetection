@@ -4,7 +4,6 @@ package com.tech.testfacedetection;
 import static android.content.Context.MODE_PRIVATE;
 
 public class DriverParameters {
-    //TODO save data to storage
 
     public DriverParameters(float ry, float rz, float eop, float mor, float eyeclf){
         this.rotY = ry;
@@ -19,7 +18,7 @@ public class DriverParameters {
         rotY = 0;
         rotZ = 0;
         EOP = 0.8f;
-        MOR = 0.15f;
+        MOR = 0.2f;
     }
 
     private boolean areParamsSet = false;

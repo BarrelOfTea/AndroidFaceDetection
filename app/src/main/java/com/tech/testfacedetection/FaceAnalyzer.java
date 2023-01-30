@@ -73,7 +73,7 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                         public void onSuccess(List<Face> faces) {
                                             // Task completed successfully
                                             //facesList = faces;
-                                            Log.v(null, faces.size() + "FACES WERE DETECTED");
+                                            Log.v(null, faces.size() + " FACES WERE DETECTED");
 
                                             for (Face face : faces){
                                                 Rect bounds = face.getBoundingBox();
@@ -86,10 +86,11 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                                 bitmap = drawer.drawContours(bitmap, leftEyeContour);
                                                 List<PointF> rightEyeContour = face.getContour(FaceContour.RIGHT_EYE).getPoints();
                                                 bitmap = drawer.drawContours(bitmap, rightEyeContour);
-                                                List<PointF> upperLipBottomContour = face.getContour(FaceContour.UPPER_LIP_BOTTOM).getPoints();
-                                                bitmap = drawer.drawContours(bitmap, upperLipBottomContour);
-                                                List<PointF> lowerLipTopContour = face.getContour(FaceContour.LOWER_LIP_TOP).getPoints();
-                                                bitmap = drawer.drawContours(bitmap, lowerLipTopContour);
+                                                List<PointF> upperLipCon = face.getContour(FaceContour.UPPER_LIP_TOP).getPoints();
+                                                bitmap = drawer.drawContours(bitmap, upperLipCon);
+                                                List<PointF> lowerLipCon = face.getContour(FaceContour.LOWER_LIP_BOTTOM).getPoints();
+                                                bitmap = drawer.drawContours(bitmap, lowerLipCon);
+                                                
 
                                                 float REOP = 0;
                                                 float LEOP = 0;
@@ -103,13 +104,15 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                                 if ((REOP+LEOP)/2<activity.params.getEOP()) eyeFlag++;
                                                 else {
                                                     eyeFlag = 0;
-                                                    activity.resetText();
+                                                    //activity.resetText();
                                                 }
                                                 if (eyeFlag>=EYE_THRESH){
                                                     activity.enableAlert("WAKE UP! FIND A SPOT TO HAVE REST");
                                                 }
 
-                                                if (getMOR(upperLipBottomContour, lowerLipTopContour)>activity.params.getMOR()) mouthFlag++;
+                                                float MOR = getMOR(upperLipCon, lowerLipCon);
+
+                                                if (MOR>activity.params.getMOR()) mouthFlag++;
                                                 else {
                                                     mouthFlag = 0;
                                                     //activity.resetText();
@@ -118,9 +121,10 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                                     activity.enableWarning("YOU ARE SLEEPY! DRIVE TO THE CLOSEST PARKING TO HAVE SOME REST");
                                                 }
 
+                                                if(eyeFlag<EYE_THRESH && mouthFlag<MOUTH_THRESH) activity.resetText();
 
 
-                                                //log(REOP, LEOP, upperLipBottomContour, lowerLipTopContour, rotY, rotZ);
+                                                log(LEOP, REOP, MOR, rotY, rotZ);
 
                                                 Log.v(null, Float.toString(rotY) + " roty");
                                                 Log.v(null, Float.toString(rotZ) + " rotz");
@@ -171,7 +175,7 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
 
 
     // leop = left eye open probability
-    private void log(float leop, float reop, List<PointF> ul, List<PointF> ll, float rY, float rZ){
+    private void log(float leop, float reop, float mor, float rY, float rZ){
 
         PointF upper = new PointF(0,0);
         PointF lower= new PointF(0,0);
@@ -187,29 +191,13 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
             headInclined = true;
         }
 
-        for (int i = 0; i < 8; i++){
-            if (i==0){
-                leftCorner = ul.iterator().next();
-            }
-            if (i==4) {
-                upper = ul.iterator().next();
-                lower = ll.iterator().next();
-            }
-            if (i==8){
-                rightCorner = ul.iterator().next();
-            }
-        }
-
-        float mouthDistVert = (float) Math.sqrt((upper.x - lower.x) * (upper.x - lower.x) + (upper.y - lower.y) * (upper.y - lower.y));
-        float mouthDistHor = (float) Math.sqrt(Math.pow(leftCorner.x - rightCorner.x, 2) + Math.pow(leftCorner.y - rightCorner.y, 2));
-        float MOR = mouthDistVert/mouthDistHor;
-        if (MOR>activity.params.getMOR()) mouthOpen = true;
+        if (mor>activity.params.getMOR()) mouthOpen = true;
 
         float averOpenProb = (leop+reop)/2;
         if (averOpenProb<activity.params.getEOP()) eyeClosed = true;
 
-        activity.log.add(new LogObject(LocalTime.now(), eyeClosed, mouthOpen, headInclined, rY, rZ, averOpenProb, MOR));
-
+        activity.log.add(new LogObject(LocalTime.now(), eyeClosed, mouthOpen, headInclined, rY, rZ, averOpenProb, mor));
+        activity.log.size();
     }
     //you can do it, move on!
 
