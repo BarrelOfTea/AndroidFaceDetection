@@ -31,8 +31,8 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
     
     int eyeFlag;
     int mouthFlag;
-    static final int EYE_THRESH = 14;
-    static final int MOUTH_THRESH = 21;
+    static final int EYE_THRESH = 10;
+    static final int MOUTH_THRESH = 15;
 
     private FaceDetectorActivity activity;
 
@@ -102,10 +102,13 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                                 }
                                                 
                                                 if ((REOP+LEOP)/2<activity.params.getEOP()) eyeFlag++;
+                                                //TODO eye open probability does not work with asian eyes, use eye aspect ratio
+
                                                 else {
                                                     eyeFlag = 0;
                                                     //activity.resetText();
                                                 }
+                                                Log.v(null, "eyeflag is "+eyeFlag+" with eop "+REOP);
                                                 if (eyeFlag>=EYE_THRESH){
                                                     activity.enableAlert("WAKE UP! FIND A SPOT TO HAVE REST");
                                                 }
@@ -115,8 +118,10 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                                 if (MOR>activity.params.getMOR()) mouthFlag++;
                                                 else {
                                                     mouthFlag = 0;
+
                                                     //activity.resetText();
                                                 }
+                                                Log.v(null, "mouthflag is "+mouthFlag+" with mor "+MOR);
                                                 if (mouthFlag>=MOUTH_THRESH){
                                                     activity.enableWarning("YOU ARE SLEEPY! DRIVE TO THE CLOSEST PARKING TO HAVE SOME REST");
                                                 }
@@ -197,7 +202,7 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
         if (averOpenProb<activity.params.getEOP()) eyeClosed = true;
 
         activity.log.add(new LogObject(LocalTime.now(), eyeClosed, mouthOpen, headInclined, rY, rZ, averOpenProb, mor));
-        activity.log.size();
+        Log.v(null, "size of log is " + activity.log.size());
     }
     //you can do it, move on!
 

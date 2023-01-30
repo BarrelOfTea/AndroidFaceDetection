@@ -14,6 +14,7 @@ import android.graphics.drawable.Drawable;
 import android.media.Image;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -29,6 +30,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.ImageCapture;
+import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.core.app.ActivityCompat;
@@ -64,6 +67,7 @@ import static android.preference.PreferenceManager.getDefaultSharedPreferences;
 
 
 public class FaceDetectorActivity extends AppCompatActivity {
+    //TODO change compileSdk and minsSdk to 26
     private static final int CAMERA_PERMISSION_REQUEST = 654654;
 
     private Button scan_button;
@@ -88,7 +92,10 @@ public class FaceDetectorActivity extends AppCompatActivity {
     private MediaPlayer playerYellow;
     ArrayList<LogObject> log;
 
+    ImageCapture imageCapture;
+
     SharedPreferences sharedPrefs;
+    int eyeFlag;
 
 
     //private DrowsinessAnalyzer timelyAnalyzer;
@@ -102,13 +109,20 @@ public class FaceDetectorActivity extends AppCompatActivity {
         scan_button = findViewById(R.id.button);
         textView = findViewById(R.id.textView);
 
+        scan_button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                setParamsOnce();
+            }
+        });
+
         params = new DriverParameters();
         log  = new ArrayList<>(Arrays.asList(new LogObject[]{new LogObject()}));
 
-        /*playerRed = MediaPlayer.create(this, R.raw.bleep);
+        playerRed = MediaPlayer.create(this, R.raw.bleep);
         playerRed.setVolume(1.0f, 1.0f);
         playerYellow = MediaPlayer.create(this, R.raw.notification);
-        playerYellow.setVolume(0.5f, 0.5f);*/
+        playerYellow.setVolume(0.5f, 0.5f);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
@@ -129,11 +143,47 @@ public class FaceDetectorActivity extends AppCompatActivity {
         Timer timer = new Timer();
         timer.schedule(new DrowsinessAnalyzer(FaceDetectorActivity.this), 6000, 0);*/
 
-        HandlerThread handlerThread = new HandlerThread("MyHandlerThread");
+        /*HandlerThread handlerThread = new HandlerThread("MyHandlerThread");
         handlerThread.start();
         Looper looper = handlerThread.getLooper();
         Handler handler = new Handler(looper);
-        handler.post(new DrowsinessAnalyzer(this));
+        handler.post(new DrowsinessAnalyzer(this));*/
+        eyeFlag = 0;
+
+        /*new CountDownTimer(6000, 1000){
+            public void onTick(long millisUntilFinished) {
+
+            }
+
+            public void onFinish() {
+
+            }
+        }.start();*/
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while(true){
+                    try {
+                        Thread.sleep(10000);
+                    }catch (InterruptedException e){
+                        e.printStackTrace();
+                    }
+                    for (int i = 0; i<log.size(); i++){
+                        if (log.get(i).eyeClosed) eyeFlag++;
+                    }
+
+                    float freq = 0.25f;
+                    if (log.size()!=0) freq=eyeFlag/log.size();
+                    if (freq>params.getEyeCloseFreq()) {
+                        setText("Your eyes are closing more often, consider some rest");
+                    }
+                    Log.v(null, "LOG CONTAINS ITEMS: "+ log.size());
+                    //TODO it is called only once, than log never cleans, stack overflows, check that
+                    log.clear();
+                }
+            }
+        }).start();
     }
 
     @Override
@@ -152,10 +202,16 @@ public class FaceDetectorActivity extends AppCompatActivity {
                 try {
 
                     ProcessCameraProvider cameraProvider = cameraProvideFuture.get();
+
                     ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
                             .setTargetResolution(new Size(480, 360))
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build();
+
+                    imageCapture =
+                            new ImageCapture.Builder()
+                                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                    .build();
 
                     CameraSelector cameraSelector = new CameraSelector.Builder()
                             .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
@@ -164,7 +220,7 @@ public class FaceDetectorActivity extends AppCompatActivity {
                     imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(FaceDetectorActivity.this),
                             new FaceAnalyzer(FaceDetectorActivity.this));
 
-                    cameraProvider.bindToLifecycle(FaceDetectorActivity.this, cameraSelector, imageAnalysis);
+                    cameraProvider.bindToLifecycle(FaceDetectorActivity.this, cameraSelector, imageAnalysis, imageCapture);
 
                 } catch (ExecutionException e){
                     e.printStackTrace();
@@ -198,7 +254,51 @@ public class FaceDetectorActivity extends AppCompatActivity {
         playerRed = null;
     }
 
-    
+    private void setParamsOnce(){
+        /*imageCapture.takePicture(ContextCompat.getMainExecutor(FaceDetectorActivity.this), new ImageCapture.OnImageCapturedCallback() {
+            @Override
+            public void onCaptureSuccess(@NonNull ImageProxy image) {
+                super.onCaptureSuccess(image);
+                Image img = image.getImage();
+                bitmap = translator.translateYUV(img, FaceDetectorActivity.this);
+
+                if (img != null) {
+                    InputImage inputImage = InputImage.fromMediaImage(img, image.getImageInfo().getRotationDegrees());
+                    detector.process(inputImage)
+                            .addOnSuccessListener(new OnSuccessListener<List<Face>>() {
+                                @Override
+                                public void onSuccess(List<Face> faces) {
+                                    for (Face face: faces){
+
+                                    }
+                                }
+                            })
+                            .addOnFailureListener(new OnFailureListener() {
+                                @Override
+                                public void onFailure(@NonNull Exception e) {
+
+                                }
+                            });
+                }
+
+                image.close();
+                detector.close();
+            }
+
+            @Override
+            public void onError(@NonNull ImageCaptureException exception) {
+                super.onError(exception);
+            }
+        });*/
+        while (true){
+            if (log.size()!=0){
+                params.setMOR(log.get(log.size()-1).mor);
+                params.setEOP(log.get(log.size()-1).eop);
+                break;
+            }
+        }
+        Log.v(null, "newly set mor is " + params.getMOR() + " and set eop is " + params.getEOP());
+    }
     
     private void checkDriverParameters(){
 
@@ -290,13 +390,13 @@ public class FaceDetectorActivity extends AppCompatActivity {
     public void enableWarning(String msg){
         //textView.setText("YOU SEEM TO BE SLEEPY, PLEASE CONSIDER STOPPING SOMEWHERE");
         textView.setText(msg);
-        //if (!playerYellow.isPlaying()) playerYellow.start();
+        if (!playerYellow.isPlaying()) playerYellow.start();
     }
 
     public void enableAlert(String msg){
         //textView.setText("WAKE UP! FIND SOME PLACE TO REST");
         textView.setText(msg);
-        //if (!playerRed.isPlaying()) playerRed.start();
+        if (!playerRed.isPlaying()) playerRed.start();
     }
 
     public void resetText(){

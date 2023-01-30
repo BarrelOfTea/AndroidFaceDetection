@@ -17,7 +17,7 @@ public class DriverParameters {
     public DriverParameters(){
         rotY = 0;
         rotZ = 0;
-        EOP = 0.8f;
+        EOP = 0.4f;
         MOR = 0.2f;
     }
 

@@ -25,7 +25,7 @@ public class DrowsinessAnalyzer implements Runnable {
     @Override
     public void run() {
 
-
+/*
         for (int i = 0; i<activity.log.size(); i++){
             if (log.get(i).eyeClosed) eyeFlag++;
         }
@@ -55,10 +55,10 @@ public class DrowsinessAnalyzer implements Runnable {
                     handler.postDelayed(handlerTask, 0);
                 }
             };
-            handlerTask.run();*/
+            handlerTask.run();
         }
 
-        log.clear();
+        log.clear();*/
     }
 
 }
