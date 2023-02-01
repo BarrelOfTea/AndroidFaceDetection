@@ -8,10 +8,8 @@ import android.media.Image;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
-import androidx.core.app.ActivityCompat;
 
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -31,8 +29,12 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
     
     int eyeFlag;
     int mouthFlag;
-    static final int EYE_THRESH = 10;
-    static final int MOUTH_THRESH = 15;
+    int noseFlag;
+    int notBlinkFlag;
+    static final int EYE_THRESH = 16;
+    static final int MOUTH_THRESH = 18;
+    static final int NO_BLINK_TH = 80;
+    static final float ROUND = 0.6f;
 
     private FaceDetectorActivity activity;
 
@@ -53,6 +55,8 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
         this.activity = activity;
         eyeFlag = 0;
         mouthFlag = 0;
+        noseFlag = 0;
+        notBlinkFlag = 0;
     }
 
     @Override
@@ -71,16 +75,16 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                     new OnSuccessListener<List<Face>>() {
                                         @Override
                                         public void onSuccess(List<Face> faces) {
-                                            // Task completed successfully
-                                            //facesList = faces;
                                             Log.v(null, faces.size() + " FACES WERE DETECTED");
 
                                             for (Face face : faces){
                                                 Rect bounds = face.getBoundingBox();
                                                 bitmap = drawer.drawRect(bitmap, bounds);
 
+
                                                 float rotY = face.getHeadEulerAngleY();  // Head is rotated to the right rotY degrees
                                                 float rotZ = face.getHeadEulerAngleZ(); //TODO rotY and rotZ are somehow always 0.0 and -0.0
+                                                float rotX = face.getHeadEulerAngleX();
 
                                                 List<PointF> leftEyeContour = face.getContour(FaceContour.LEFT_EYE).getPoints();
                                                 bitmap = drawer.drawContours(bitmap, leftEyeContour);
@@ -90,50 +94,76 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                                 bitmap = drawer.drawContours(bitmap, upperLipCon);
                                                 List<PointF> lowerLipCon = face.getContour(FaceContour.LOWER_LIP_BOTTOM).getPoints();
                                                 bitmap = drawer.drawContours(bitmap, lowerLipCon);
-                                                
+                                                List<PointF> noseCon = face.getContour(FaceContour.NOSE_BRIDGE).getPoints();
+                                                bitmap = drawer.drawContours(bitmap, noseCon);
 
-                                                float REOP = 0;
-                                                float LEOP = 0;
-                                                if (face.getRightEyeOpenProbability() != null) {
-                                                    REOP = face.getRightEyeOpenProbability();
-                                                }
-                                                if (face.getLeftEyeOpenProbability() != null) {
-                                                    LEOP = face.getRightEyeOpenProbability();
-                                                }
-                                                
-                                                if ((REOP+LEOP)/2<activity.params.getEOP()) eyeFlag++;
-                                                //TODO eye open probability does not work with asian eyes, use eye aspect ratio
 
+                                                /*long endTime = System.nanoTime();
+                                                long timePassed = endTime - startTime;
+                                                Log.v(null, "Execution time before eop " + timePassed / 1000000);*/
+
+                                                float REOP = getOneEOP(rightEyeContour);
+                                                float LEOP = getOneEOP(leftEyeContour);
+
+                                                /*long endTime1 = System.nanoTime();
+                                                long timePassed1 = endTime1 - startTime;
+                                                Log.v(null, "Execution time after eop: " + timePassed1 / 1000000);*/
+
+                                                notBlinkFlag++;
+
+                                                if ((LEOP+REOP)/2 < activity.params.getEOP()) {
+                                                    eyeFlag++;
+                                                    notBlinkFlag = 0;
+                                                    Log.v(null, "you blinked");
+                                                }
                                                 else {
                                                     eyeFlag = 0;
-                                                    //activity.resetText();
                                                 }
-                                                Log.v(null, "eyeflag is "+eyeFlag+" with eop "+REOP);
+                                                
                                                 if (eyeFlag>=EYE_THRESH){
                                                     activity.enableAlert("WAKE UP! FIND A SPOT TO HAVE REST");
+                                                    Log.v(null, "REASON closed eyes");
+                                                }
+                                                if (notBlinkFlag > NO_BLINK_TH){
+                                                    activity.enableAlert("WAKE UP! YOU ARE SLEEPING WITH OPEN EYES");
+                                                    Log.v(null, "REASON always open eyes");
                                                 }
 
+                                                /*long endTime2 = System.nanoTime();
+                                                long timePassed2 = endTime2 - startTime;
+                                                Log.v(null, "Execution time before mor: " + timePassed2 / 1000000);*/
                                                 float MOR = getMOR(upperLipCon, lowerLipCon);
-
-                                                if (MOR>activity.params.getMOR()) mouthFlag++;
+                                                /*long endTime3 = System.nanoTime();
+                                                long timePassed3 = endTime3 - startTime;
+                                                Log.v(null, "Execution time after mor: " + timePassed3 / 1000000);*/
+                                                if (MOR > activity.params.getMOR()) mouthFlag++;
                                                 else {
                                                     mouthFlag = 0;
-
-                                                    //activity.resetText();
                                                 }
                                                 Log.v(null, "mouthflag is "+mouthFlag+" with mor "+MOR);
                                                 if (mouthFlag>=MOUTH_THRESH){
                                                     activity.enableWarning("YOU ARE SLEEPY! DRIVE TO THE CLOSEST PARKING TO HAVE SOME REST");
+                                                    Log.v(null, "REASON yawn");
                                                 }
 
-                                                if(eyeFlag<EYE_THRESH && mouthFlag<MOUTH_THRESH) activity.resetText();
+                                                if(eyeFlag<EYE_THRESH && mouthFlag<MOUTH_THRESH && noseFlag<EYE_THRESH) activity.resetText();
 
+                                                float nl = getNL(noseCon);
+                                                if (nl < activity.params.getNL()) noseFlag++;
+                                                else {
+                                                    noseFlag = 0;
+                                                }
+                                                Log.v(null, "nose flag is "+noseFlag+" with nose length "+nl);
+                                                if (noseFlag >= EYE_THRESH){
+                                                    activity.enableAlert("YOU ARE DOZING OFF! DRIVE TO THE CLOSEST PARKING LOT");
+                                                    Log.v(null, "REASON dosed off");
+                                                }
 
-                                                log(LEOP, REOP, MOR, rotY, rotZ);
+                                                log(LEOP, REOP, MOR, rotY, rotZ, nl);
 
-                                                Log.v(null, Float.toString(rotY) + " roty");
-                                                Log.v(null, Float.toString(rotZ) + " rotz");
-
+                                                Log.v(null, rotY + " roty");
+                                                Log.v(null, rotZ + " rotz");
+                                                Log.v(null, rotX + " rotx");
                                             }
 
                                         }
@@ -142,7 +172,6 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                     new OnFailureListener() {
                                         @Override
                                         public void onFailure(@NonNull Exception e) {
-                                            // Task failed with an exception
                                             System.out.println("there was an error processing an image");
                                         }
                                     })
@@ -150,11 +179,7 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
                                     new OnCompleteListener<List<Face>>() {
                                         @Override
                                         public void onComplete(@NonNull Task<List<Face>> task) {
-
-                                            //preview.setRotation(image.getImageInfo().getRotationDegrees());
-
-
-
+                                            //activity.preview.setRotation(image.getImageInfo().getRotationDegrees());
                                             activity.setPreview(bitmap);
 
                                             image.close();
@@ -180,13 +205,8 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
 
 
     // leop = left eye open probability
-    private void log(float leop, float reop, float mor, float rY, float rZ){
+    private void log(float leop, float reop, float mor, float rY, float rZ, float nl){
 
-        PointF upper = new PointF(0,0);
-        PointF lower= new PointF(0,0);
-        //these are points for calculating width of a mouth
-        PointF leftCorner = new PointF(0,0);
-        PointF rightCorner = new PointF(0,0);
 
         boolean eyeClosed = false;
         boolean mouthOpen = false;
@@ -201,12 +221,25 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
         float averOpenProb = (leop+reop)/2;
         if (averOpenProb<activity.params.getEOP()) eyeClosed = true;
 
-        activity.log.add(new LogObject(LocalTime.now(), eyeClosed, mouthOpen, headInclined, rY, rZ, averOpenProb, mor));
+        activity.log.add(new LogObject(LocalTime.now(), eyeClosed, mouthOpen, headInclined, rY, rZ, averOpenProb, mor, nl));
         Log.v(null, "size of log is " + activity.log.size());
     }
     //you can do it, move on!
 
     float getMOR(List<PointF> ul, List<PointF> ll){
+        PointF [] upoints = new PointF[ul.size()];
+        ul.toArray(upoints);
+
+        PointF [] lpoints = new PointF[ll.size()];
+        ll.toArray(lpoints);
+
+        float ver = (float) Math.sqrt(Math.pow(upoints[5].x - lpoints[4].x, 2) + Math.pow(upoints[5].y - lpoints[4].y, 2));
+        float hor = (float) Math.sqrt(Math.pow(upoints[0].x - upoints[10].x, 2) + Math.pow(upoints[0].y - upoints[10].y, 2));
+
+
+        return ver/hor;
+
+        /*
         PointF upper = new PointF(0,0);
         PointF lower= new PointF(0,0);
         //these are points for calculating width of a mouth
@@ -234,20 +267,33 @@ public class FaceAnalyzer implements ImageAnalysis.Analyzer {
 
         Log.v(null, "calculated MOR is "+ MOR);
         return MOR;
+           */
+    }
+
+    //re = right eye, ru = right upper
+    float getOneEOP(List<PointF> contour){
+
+        PointF [] points = new PointF[contour.size()];
+        contour.toArray(points);
+
+        float rVer = (float) Math.sqrt(Math.pow(points[4].x - points[12].x, 2) + Math.pow(points[4].y - points[12].y, 2));
+        float rHor = (float) Math.sqrt(Math.pow(points[0].x - points[8].x, 2) + Math.pow(points[0].y - points[8].y, 2));
+
+        
+        return rVer/rHor;
 
     }
+
+    float getNL(List<PointF> contour){
+        PointF [] points = new PointF[contour.size()];
+        contour.toArray(points);
+
+        float nl = (float) Math.sqrt(Math.pow(points[0].x - points[1].x, 2) + Math.pow(points[0].y - points[1].y, 2));
+
+        return nl;
+    }
+    
 }
 
-/*
-* if driver params are set
-*   log
-*   compare every 10 seconds
-*   repeat
-* else
-*   for 10 seconds measure and log
-*   compare data in the log and check it meets min/max parameters
-*   set new driver parameters
-*   state that driver params are set
-*
-*
-* */
+
+//TODO it is better done with opencv, but if yu go on using ml kit, use ImageAnalysis.STRATEGY_BLOCK_PRODUCER

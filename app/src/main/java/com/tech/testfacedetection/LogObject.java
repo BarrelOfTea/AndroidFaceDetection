@@ -10,6 +10,7 @@ public class LogObject {
     float rotZ;
     float eop;
     float mor;
+    float nl;
 
     LocalTime time;
     boolean eyeClosed;
@@ -20,7 +21,7 @@ public class LogObject {
 
     }
 
-    public LogObject(LocalTime time, boolean eyeClosed, boolean mouthOpen, boolean headInclined, float roty, float rotz, float eop, float mor){
+    public LogObject(LocalTime time, boolean eyeClosed, boolean mouthOpen, boolean headInclined, float roty, float rotz, float eop, float mor, float nl){
 
         this.eyeClosed = eyeClosed;
         this.time = time;
@@ -31,8 +32,7 @@ public class LogObject {
         this.rotZ = rotz;
         this.eop = eop;
         this.mor = mor;
-
-
+        this.nl = nl;
     }
 
 }

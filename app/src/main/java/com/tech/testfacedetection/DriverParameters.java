@@ -5,20 +5,22 @@ import static android.content.Context.MODE_PRIVATE;
 
 public class DriverParameters {
 
-    public DriverParameters(float ry, float rz, float eop, float mor, float eyeclf){
+    public DriverParameters(float ry, float rz, float eop, float mor, float eyeclf, float nl){
         this.rotY = ry;
         this.rotZ = rz;
         this.EOP= eop;
         this.MOR = mor;
         this.eyeCloseFreq = eyeclf;
         this.areParamsSet = true;
+        this.NL = nl;
     }
 
     public DriverParameters(){
         rotY = 0;
         rotZ = 0;
-        EOP = 0.4f;
+        EOP = 0.25f;
         MOR = 0.2f;
+        NL = 0.3f;
     }
 
     private boolean areParamsSet = false;
@@ -26,10 +28,10 @@ public class DriverParameters {
     private float rotY;
     private float rotZ;
 
-    //instead of eye aspect ratio EAR use EOP which is eye open probability
-    //set the appropriate number between 0.0 and 1.0
     private float EOP;
     private float MOR;
+
+    private float NL;
 
     private float eyeCloseFreq = 0.25f;
 
@@ -79,5 +81,13 @@ public class DriverParameters {
 
     public void setAreParamsSet(boolean areParamsSet) {
         this.areParamsSet = areParamsSet;
+    }
+
+    public float getNL() {
+        return NL;
+    }
+
+    public void setNL(float NL) {
+        this.NL = NL;
     }
 }

@@ -67,11 +67,10 @@ import static android.preference.PreferenceManager.getDefaultSharedPreferences;
 
 
 public class FaceDetectorActivity extends AppCompatActivity {
-    //TODO change compileSdk and minsSdk to 26
     private static final int CAMERA_PERMISSION_REQUEST = 654654;
 
     private Button scan_button;
-    private ImageView preview;
+    ImageView preview;
     private TextView textView;
 
     private FaceDetectorOptions realTimeOpts = new FaceDetectorOptions.Builder()
@@ -87,6 +86,7 @@ public class FaceDetectorActivity extends AppCompatActivity {
     private DrawContours drawer = new DrawContours();
     private Bitmap bitmap;
 
+    //TODO load to and from default shared prefs
     DriverParameters params;
     private MediaPlayer playerRed;
     private MediaPlayer playerYellow;
@@ -119,10 +119,22 @@ public class FaceDetectorActivity extends AppCompatActivity {
         params = new DriverParameters();
         log  = new ArrayList<>(Arrays.asList(new LogObject[]{new LogObject()}));
 
-        playerRed = MediaPlayer.create(this, R.raw.bleep);
+        playerRed = MediaPlayer.create(this, R.raw.sirena);
         playerRed.setVolume(1.0f, 1.0f);
         playerYellow = MediaPlayer.create(this, R.raw.notification);
         playerYellow.setVolume(0.5f, 0.5f);
+        /*playerRed.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+            @Override
+            public void onPrepared(MediaPlayer mediaPlayer) {
+                playerRed.start();
+            }
+        });
+        playerYellow.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+            @Override
+            public void onPrepared(MediaPlayer mediaPlayer) {
+                playerYellow.start();
+            }
+        });*/
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
@@ -174,12 +186,19 @@ public class FaceDetectorActivity extends AppCompatActivity {
                     }
 
                     float freq = 0.25f;
-                    if (log.size()!=0) freq=eyeFlag/log.size();
+                    //if (log.size()!=0) freq=eyeFlag/log.size();
+                    if (log.size()!=0) freq=eyeFlag/10;
                     if (freq>params.getEyeCloseFreq()) {
-                        setText("Your eyes are closing more often, consider some rest");
+                        Log.v(null, "the blinking frequency is "+ freq);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                setText("Your eyes are closing more often, consider some rest");
+                            }
+                        });
+                        //setText("Your eyes are closing more often, consider some rest");
                     }
                     Log.v(null, "LOG CONTAINS ITEMS: "+ log.size());
-                    //TODO it is called only once, than log never cleans, stack overflows, check that
                     log.clear();
                 }
             }
@@ -237,15 +256,6 @@ public class FaceDetectorActivity extends AppCompatActivity {
         preview.setImageBitmap(bitmap);
     }
 
-    public void playerStart(){
-        if (!playerRed.isPlaying()) playerRed.start();
-    }
-
-    public void playerStop(){
-        if (playerRed.isPlaying()){
-            playerRed.stop();
-        }
-    }
 
     @Override
     protected void onDestroy() {
@@ -292,12 +302,13 @@ public class FaceDetectorActivity extends AppCompatActivity {
         });*/
         while (true){
             if (log.size()!=0){
-                params.setMOR(log.get(log.size()-1).mor);
-                params.setEOP(log.get(log.size()-1).eop);
+                params.setMOR(log.get(log.size()-1).mor*1.8f);
+                params.setEOP(log.get(log.size()-1).eop*0.9f);
+                params.setNL(log.get(log.size()-1).nl*0.8f);
                 break;
             }
         }
-        Log.v(null, "newly set mor is " + params.getMOR() + " and set eop is " + params.getEOP());
+        Log.v(null, "newly set mor is " + params.getMOR() + " and set eop is " + params.getEOP() + "and nose len is " + params.getNL());
     }
     
     private void checkDriverParameters(){
@@ -391,16 +402,27 @@ public class FaceDetectorActivity extends AppCompatActivity {
         //textView.setText("YOU SEEM TO BE SLEEPY, PLEASE CONSIDER STOPPING SOMEWHERE");
         textView.setText(msg);
         if (!playerYellow.isPlaying()) playerYellow.start();
+        Log.v(null, "WARNING " + "mor is " + params.getMOR() + " and set eop is " + params.getEOP() + "and nose len is " + params.getNL());
     }
 
     public void enableAlert(String msg){
         //textView.setText("WAKE UP! FIND SOME PLACE TO REST");
         textView.setText(msg);
         if (!playerRed.isPlaying()) playerRed.start();
+        Log.v(null, "ALERT " + "mor is " + params.getMOR() + " and set eop is " + params.getEOP() + "and nose len is " + params.getNL());
     }
 
     public void resetText(){
         textView.setText("You are good");
+        if (playerYellow.isPlaying()) {
+            playerYellow.pause();
+            playerYellow.seekTo(0);
+        }
+        if (playerRed.isPlaying()) {
+            playerRed.pause();
+            playerRed.seekTo(0);
+        }
+
     }
 
     public void setText(String msg){

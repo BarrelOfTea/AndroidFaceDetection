@@ -4,7 +4,6 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 31
     //TODO try 26 API to support more phones
-    //TODO create swift app for ios
     buildToolsVersion "30.0.2"
 
     defaultConfig {
